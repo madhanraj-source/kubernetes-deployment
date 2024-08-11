@@ -2,52 +2,51 @@ pipeline {
     agent any
 
     environment {
-        REGISTRY = 'your-docker-registry'
-        IMAGE_NAME = 'your-flask-app-image'
-        KUBE_CONFIG = credentials('kube-config') // Jenkins credential ID for Kube config
+        // Define environment variables if needed
+        DOCKER_IMAGE = 'your-docker-image'
+        DOCKER_REGISTRY = 'your-docker-registry'
+        DEPLOYMENT_NAMESPACE = 'default'
     }
 
     stages {
-        stage('Checkout') {
-            steps {
-                git 'https://github.com/your-repository/your-flask-app.git'
-            }
-        }
-
-        stage('Build Docker Image') {
+        stage('Build') {
             steps {
                 script {
-                    def dockerImage = docker.build("${REGISTRY}/${IMAGE_NAME}:${env.BUILD_ID}")
+                    // Pull the latest changes from the repository
+                    git 'https://your-repo-url.git'
+                    
+                    // Build Docker image
+                    sh 'docker build -t $DOCKER_REGISTRY/$DOCKER_IMAGE:latest .'
                 }
             }
         }
 
-        stage('Push Docker Image') {
+        stage('Push') {
             steps {
                 script {
-                    docker.withRegistry('https://your-docker-registry', 'docker-credentials-id') {
-                        def dockerImage = docker.image("${REGISTRY}/${IMAGE_NAME}:${env.BUILD_ID}")
-                        dockerImage.push('latest')
-                    }
+                    // Push Docker image to registry
+                    sh 'docker push $DOCKER_REGISTRY/$DOCKER_IMAGE:latest'
                 }
             }
         }
 
-        stage('Deploy to Kubernetes') {
+        stage('Deploy') {
             steps {
                 script {
-                    withKubeConfig([credentialsId: KUBE_CONFIG]) {
-                        sh 'kubectl set image deployment/flask-app-deployment flask-app=${REGISTRY}/${IMAGE_NAME}:${env.BUILD_ID}'
-                        sh 'kubectl rollout status deployment/flask-app-deployment'
-                    }
+                    // Apply Kubernetes deployment configurations
+                    sh 'kubectl set image deployment/your-deployment your-container=$DOCKER_REGISTRY/$DOCKER_IMAGE:latest --namespace=$DEPLOYMENT_NAMESPACE'
+                    sh 'kubectl rollout status deployment/your-deployment --namespace=$DEPLOYMENT_NAMESPACE'
                 }
             }
         }
     }
 
     post {
-        always {
-            cleanWs()
+        success {
+            echo 'Deployment was successful!'
+        }
+        failure {
+            echo 'Deployment failed!'
         }
     }
 }
